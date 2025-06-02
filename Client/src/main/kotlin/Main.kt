@@ -1,4 +1,3 @@
-import androidx.compose.animation.fadeIn
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
 import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -32,10 +29,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.lifecycle.viewmodel.compose.viewModel
 import viewmodels.MainViewModel
+import kotlin.text.isNotBlank
+import kotlin.text.trim
 
 @Composable
 @Preview
@@ -51,18 +51,8 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                items(viewModel.messages){
-                    Card(
-                        backgroundColor = MaterialTheme.colors.primary,
-                        contentColor = MaterialTheme.colors.onPrimary,
-                        elevation = 3.dp,
-                        modifier = Modifier.padding(top=8.dp)
-                    ){
-                        Text(
-                            it,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
+                items(viewModel.messages) {
+                    MessageCard("Отправитель", it)
                 }
 
             }
@@ -71,12 +61,37 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                 Modifier.fillMaxWidth().padding(8.dp),
                 onInput = { viewModel.inputText = it },
             ) {
-                if(viewModel.inputText.isNotBlank()){
+                if (viewModel.inputText.isNotBlank()) {
                     viewModel.messages.add(viewModel.inputText.trim())
+                    viewModel.sendMessage(viewModel.inputText.trim())
                     viewModel.inputText = ""
                 }
-
             }
+        }
+    }
+}
+
+@Composable
+fun MessageCard(
+    senderName: String,
+    messageText: String,
+    modifier: Modifier = Modifier,
+){
+    Column {
+        Text(
+            "$senderName:",
+            modifier = Modifier.padding(top = 8.dp, start = 0.dp, end = 0.dp, bottom = 0.dp)
+        )
+        Card(
+            backgroundColor = MaterialTheme.colors.primary,
+            contentColor = MaterialTheme.colors.onPrimary,
+            elevation = 3.dp,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text(
+                messageText,
+                modifier = Modifier.padding(16.dp),
+            )
         }
     }
 }
@@ -88,18 +103,19 @@ fun Input(
     onInput: (String)->Unit = {},
     onApprove: (String)->Unit = {},
 ){
-    Row(modifier = modifier,
+    Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically) {
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         OutlinedTextField(
             value = value,
             onValueChange = onInput,
-            modifier = Modifier.weight(1f).onKeyEvent{
-                if (it.type == KeyEventType.KeyUp && !it.isShiftPressed && (it.key == Key.NumPadEnter || it.key == Key.Enter)){
+            modifier = Modifier.weight(1f).onKeyEvent {
+                if (it.type == KeyEventType.KeyUp && !it.isShiftPressed && (it.key == Key.NumPadEnter || it.key == Key.Enter)) {
                     onApprove(value)
                     true
-                }
-                else false
+                } else false
             },
             trailingIcon = {
                 IconButton(
@@ -113,7 +129,7 @@ fun Input(
     }
 }
 
-fun main() = application {
+fun main() = application(true) {
     Window(onCloseRequest = ::exitApplication) {
         App()
     }

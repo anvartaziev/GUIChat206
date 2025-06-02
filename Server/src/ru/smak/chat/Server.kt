@@ -1,12 +1,9 @@
 package ru.smak.chat
 
 import kotlinx.coroutines.*
-import java.io.PrintWriter
 import java.net.InetSocketAddress
-import java.net.ServerSocket
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.util.*
-import kotlin.concurrent.thread
 import kotlin.coroutines.suspendCoroutine
 
 class Server(

@@ -1,13 +1,12 @@
 package ru.smak.chat
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.io.PrintWriter
 import java.net.InetSocketAddress
-import java.net.Socket
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.*
-import javax.annotation.processing.Messager
-import kotlin.concurrent.thread
 import kotlin.coroutines.suspendCoroutine
 
 class Client(
@@ -16,6 +15,14 @@ class Client(
 ) {
     private val socket = AsynchronousSocketChannel.open()
     private val communicator = Communicator(socket)
+    private val clientScope = CoroutineScope(Dispatchers.IO)
+    private val messageListeners = mutableListOf<(String)->Unit>()
+    fun addMessageListener(listener: (String)->Unit){
+        messageListeners.add(listener)
+    }
+    fun removeMessageListener(listener: (String)->Unit){
+        messageListeners.remove(listener)
+    }
 
     init {
         runBlocking {
@@ -26,23 +33,18 @@ class Client(
                 )
             }
             communicator.start(::parse)
-
-            while (communicator.isRunning) {
-                val userScanner = Scanner(System.`in`)
-                val userInput = userScanner.nextLine()
-                if (userInput.isNotBlank())
-                    communicator.sendMessage(userInput)
-                else
-                    stop()
-            }
         }
     }
 
     private fun parse(message: String){
-        println(message)
+        messageListeners.forEach { it(message) }
     }
 
     fun stop(){
         communicator.stop()
+    }
+    fun sendMessage(message: String)=clientScope.launch {
+        if (message.isNotBlank())
+            communicator.sendMessage(message)
     }
 }
