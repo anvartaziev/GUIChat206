@@ -6,7 +6,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.*
 import kotlin.coroutines.suspendCoroutine
 
 class Client(
@@ -46,5 +45,9 @@ class Client(
     fun sendMessage(message: String)=clientScope.launch {
         if (message.isNotBlank())
             communicator.sendMessage(message)
+    }
+
+    fun sendCommand(cmd: String)=clientScope.launch {
+        communicator.sendMessage(cmd)
     }
 }
