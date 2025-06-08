@@ -1,25 +1,12 @@
 import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Card
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -29,67 +16,90 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import kotlin.system.exitProcess
 import androidx.lifecycle.viewmodel.compose.viewModel
 import viewmodels.MainViewModel
-import kotlin.text.isNotBlank
-import kotlin.text.trim
+import viewmodels.ChatMessage
 
+/** Entry point composable that switches between login screen and chat screen. */
 @Composable
 @Preview
 fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
     MaterialTheme {
-        Column(
-            modifier = Modifier.padding(8.dp).fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        if (!viewModel.authorized) LoginScreen(viewModel) else ChatScreen(viewModel)
+    }
+}
 
+@Composable
+/** Screen shown before authentication. */
+fun LoginScreen(vm: MainViewModel){
+    Column(modifier = Modifier.padding(8.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)){
+        OutlinedTextField(vm.login, { vm.login = it }, label={ Text("Login") })
+        OutlinedTextField(vm.password, { vm.password = it }, label={ Text("Password") })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)){
+            Button(onClick = { vm.doLogin() }){ Text("Login") }
+            Button(onClick = { vm.doRegister() }){ Text("Register") }
+        }
+        // Show all service messages from the server
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()){ 
+            items(vm.messages){ MessageCard("", it) } 
+        }
+    }
+}
 
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                items(viewModel.messages) {
-                    MessageCard("Отправитель", it)
-                }
-
+@Composable
+/** Main chat UI shown after login. */
+fun ChatScreen(viewModel: MainViewModel){
+    Row(modifier = Modifier.padding(8.dp).fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)){
+        Column(modifier = Modifier.weight(1f)){
+            // Messages list
+            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Bottom){
+                items(viewModel.messages){ MessageCard("", it) }
             }
-            Input(
-                viewModel.inputText,
-                Modifier.fillMaxWidth().padding(8.dp),
-                onInput = { viewModel.inputText = it },
-            ) {
-                if (viewModel.inputText.isNotBlank()) {
-                    viewModel.messages.add(viewModel.inputText.trim())
+            Input(viewModel.inputText, Modifier.fillMaxWidth().padding(8.dp), onInput = { viewModel.inputText = it }){
+                if (viewModel.inputText.isNotBlank()){
+                    // Add message locally before sending
+                    viewModel.messages.add(ChatMessage("Me->${viewModel.selectedUser ?: "all"}: ${viewModel.inputText.trim()}", true))
                     viewModel.sendMessage(viewModel.inputText.trim())
                     viewModel.inputText = ""
                 }
+            }
+        }
+        // List of users that can be selected as message recipients
+        LazyColumn(modifier = Modifier.width(150.dp).fillMaxHeight()){
+            items(viewModel.users){ u ->
+                Text(u, modifier = Modifier.fillMaxWidth().padding(4.dp).clickable {
+                    viewModel.selectedUser = if (u == "General") null else u
+                })
             }
         }
     }
 }
 
 @Composable
+/** Card displaying a single chat message. */
 fun MessageCard(
     senderName: String,
-    messageText: String,
+    message: ChatMessage,
     modifier: Modifier = Modifier,
 ){
     Column {
-        Text(
-            "$senderName:",
-            modifier = Modifier.padding(top = 8.dp, start = 0.dp, end = 0.dp, bottom = 0.dp)
-        )
+        if (senderName.isNotBlank())
+            Text(
+                "$senderName:",
+                modifier = Modifier.padding(top = 8.dp)
+            )
         Card(
-            backgroundColor = MaterialTheme.colors.primary,
+            // Lighter color is used for our own messages
+            backgroundColor = if (message.own) MaterialTheme.colors.primary.copy(alpha = 0.6f) else MaterialTheme.colors.primary,
             contentColor = MaterialTheme.colors.onPrimary,
             elevation = 3.dp,
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text(
-                messageText,
+                message.text,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -97,6 +107,7 @@ fun MessageCard(
 }
 
 @Composable
+/** Reusable component for text input with Enter key handling. */
 fun Input(
     value: String,
     modifier: Modifier = Modifier,
@@ -129,8 +140,9 @@ fun Input(
     }
 }
 
+/** Desktop entry point launching the Compose application. */
 fun main() = application(true) {
-    Window(onCloseRequest = ::exitApplication) {
+    Window(onCloseRequest = { exitProcess(0) }) {
         App()
     }
 }
