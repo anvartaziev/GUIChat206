@@ -3,6 +3,9 @@ package ru.smak.chat
 import kotlinx.coroutines.*
 import java.nio.channels.AsynchronousSocketChannel
 
+/**
+ * Represents a single connected client and handles all communication with it.
+ */
 class ConnectedClient(private val socket: AsynchronousSocketChannel) {
 
     private val communicator = Communicator(socket)
@@ -10,9 +13,13 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
     private val clientScope = CoroutineScope(Dispatchers.IO)
 
     init {
+        // Start listening for incoming messages from this client
         communicator.start { message -> parse(message) }
     }
 
+    /**
+     * Parse a single command from the client and execute it.
+     */
     private fun parse(message: String) {
         val parts = message.trim().split(" ", limit = 2)
         when(parts[0]){
@@ -47,7 +54,8 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
             }
             "BROADCAST" -> {
                 val u = userName ?: return
-                parts.getOrNull(1)?.let { sendToAll("MSG $u $it", true) }
+                // Broadcast to other users; we already display our own message locally
+                parts.getOrNull(1)?.let { sendToAll("MSG $u $it", false) }
             }
             "LIST" -> {
                 sendUserList()
@@ -58,6 +66,7 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
         }
     }
 
+    /** Send all queued offline messages to the client once they log in. */
     private fun sendOffline(){
         val u = userName ?: return
         UserRegistry.popOfflineMessages(u).forEach { (from,msg) ->
@@ -65,10 +74,12 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
         }
     }
 
+    /** Enqueue a message to be sent asynchronously. */
     fun send(msg: String){
         clientScope.launch { communicator.sendMessage(msg) }
     }
 
+    /** Stop communication and remove client from the list of connected users. */
     fun stop(){
         communicator.stop()
         userName?.let {
@@ -77,6 +88,10 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
         }
     }
 
+    /**
+     * Deliver a private message. If recipient is offline it will be saved for
+     * later delivery.
+     */
     private fun sendPrivate(from: String, to: String, msg: String){
         val rcpt = connectedClients[to]
         if (rcpt != null){
@@ -86,17 +101,20 @@ class ConnectedClient(private val socket: AsynchronousSocketChannel) {
         }
     }
 
+    /** Broadcast a message to all connected clients. */
     private fun sendToAll(message: String, includeSelf: Boolean = false){
         connectedClients.values.forEach {
             if (includeSelf || it != this) it.send(message)
         }
     }
 
+    /** Send list of currently connected users to this client. */
     private fun sendUserList(){
         val list = connectedClients.keys.joinToString(",")
         send("USERS $list")
     }
 
+    /** Inform every client that the set of online users has changed. */
     private fun updateUserLists(){
         connectedClients.values.forEach { it.sendUserList() }
     }

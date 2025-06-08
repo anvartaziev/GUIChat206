@@ -21,7 +21,9 @@ import androidx.compose.ui.window.application
 import kotlin.system.exitProcess
 import androidx.lifecycle.viewmodel.compose.viewModel
 import viewmodels.MainViewModel
+import viewmodels.ChatMessage
 
+/** Entry point composable that switches between login screen and chat screen. */
 @Composable
 @Preview
 fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
@@ -31,6 +33,7 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
 }
 
 @Composable
+/** Screen shown before authentication. */
 fun LoginScreen(vm: MainViewModel){
     Column(modifier = Modifier.padding(8.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)){
         OutlinedTextField(vm.login, { vm.login = it }, label={ Text("Login") })
@@ -39,39 +42,47 @@ fun LoginScreen(vm: MainViewModel){
             Button(onClick = { vm.doLogin() }){ Text("Login") }
             Button(onClick = { vm.doRegister() }){ Text("Register") }
         }
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()){
-            items(vm.messages){ MessageCard("", it) }
+        // Show all service messages from the server
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()){ 
+            items(vm.messages){ MessageCard("", it) } 
         }
     }
 }
 
 @Composable
+/** Main chat UI shown after login. */
 fun ChatScreen(viewModel: MainViewModel){
     Row(modifier = Modifier.padding(8.dp).fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)){
         Column(modifier = Modifier.weight(1f)){
+            // Messages list
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Bottom){
                 items(viewModel.messages){ MessageCard("", it) }
             }
             Input(viewModel.inputText, Modifier.fillMaxWidth().padding(8.dp), onInput = { viewModel.inputText = it }){
                 if (viewModel.inputText.isNotBlank()){
-                    viewModel.messages.add("Me->${viewModel.selectedUser ?: "all"}: ${viewModel.inputText.trim()}")
+                    // Add message locally before sending
+                    viewModel.messages.add(ChatMessage("Me->${viewModel.selectedUser ?: "all"}: ${viewModel.inputText.trim()}", true))
                     viewModel.sendMessage(viewModel.inputText.trim())
                     viewModel.inputText = ""
                 }
             }
         }
+        // List of users that can be selected as message recipients
         LazyColumn(modifier = Modifier.width(150.dp).fillMaxHeight()){
             items(viewModel.users){ u ->
-                Text(u, modifier = Modifier.fillMaxWidth().padding(4.dp).clickable { viewModel.selectedUser = u })
+                Text(u, modifier = Modifier.fillMaxWidth().padding(4.dp).clickable {
+                    viewModel.selectedUser = if (u == "General") null else u
+                })
             }
         }
     }
 }
 
 @Composable
+/** Card displaying a single chat message. */
 fun MessageCard(
     senderName: String,
-    messageText: String,
+    message: ChatMessage,
     modifier: Modifier = Modifier,
 ){
     Column {
@@ -81,13 +92,14 @@ fun MessageCard(
                 modifier = Modifier.padding(top = 8.dp)
             )
         Card(
-            backgroundColor = MaterialTheme.colors.primary,
+            // Lighter color is used for our own messages
+            backgroundColor = if (message.own) MaterialTheme.colors.primary.copy(alpha = 0.6f) else MaterialTheme.colors.primary,
             contentColor = MaterialTheme.colors.onPrimary,
             elevation = 3.dp,
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text(
-                messageText,
+                message.text,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -95,6 +107,7 @@ fun MessageCard(
 }
 
 @Composable
+/** Reusable component for text input with Enter key handling. */
 fun Input(
     value: String,
     modifier: Modifier = Modifier,
@@ -127,6 +140,7 @@ fun Input(
     }
 }
 
+/** Desktop entry point launching the Compose application. */
 fun main() = application(true) {
     Window(onCloseRequest = { exitProcess(0) }) {
         App()
